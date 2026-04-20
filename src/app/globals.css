@@ -1,0 +1,123 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+@import "tailwindcss";
+
+:root {
+  --background: #000000;
+  --foreground: #ffffff;
+  --muted: #a1a1aa;
+  --card: #09090b;
+  --border: rgba(255, 255, 255, 0.1);
+  --accent: #E50914;
+}
+
+body {
+  background-color: var(--background);
+  color: var(--foreground);
+  font-family: 'Inter', sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: var(--background);
+}
+::-webkit-scrollbar-thumb {
+  background: #27272a;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #3f3f46;
+}
+
+/* Utilities */
+.text-muted {
+  color: var(--muted);
+}
+
+.bg-card {
+  background-color: var(--card);
+}
+
+.b-card {
+  border: 1px solid var(--border);
+}
+
+/* Button variants */
+.btn-primary {
+  background-color: var(--accent);
+  color: white;
+  transition: background-color 0.2s ease;
+}
+.btn-primary:hover {
+  background-color: #f40612;
+}
+.btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-secondary {
+  background-color: rgba(255, 255, 255, 0.1);
+  color: white;
+  transition: background-color 0.2s ease;
+}
+.btn-secondary:hover {
+  background-color: rgba(255, 255, 255, 0.2);
+}
+
+/* Plan Badges */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+.badge-free { background: rgba(255,255,255,0.1); color: #fff; }
+.badge-plus { background: #2563eb; color: #fff; }
+.badge-pro { background: #9333ea; color: #fff; }
+.badge-premium { background: #eab308; color: #000; }
+
+/* Image gradients */
+.hero-gradient {
+  background: linear-gradient(to top, #000000 0%, rgba(0,0,0,0.5) 50%, transparent 100%);
+}
+.card-gradient {
+  background: linear-gradient(to top, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0) 100%);
+}
+
+/* Skeleton Loading */
+.skeleton {
+  background: #18181b;
+  position: relative;
+  overflow: hidden;
+}
+.skeleton::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  transform: translateX(-100%);
+  background-image: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0) 0,
+    rgba(255, 255, 255, 0.05) 20%,
+    rgba(255, 255, 255, 0.1) 60%,
+    rgba(255, 255, 255, 0)
+  );
+  animation: shimmer 2s infinite;
+}
+@keyframes shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}

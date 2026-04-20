@@ -1,0 +1,155 @@
+#!/usr/bin/env node
+
+/**
+ * CineStream Auto-Seed Script
+ * Chạy trước khi khởi động server.
+ * - Nếu DB đã có dữ liệu → bỏ qua
+ * - Nếu DB trống → tự động seed phim + tài khoản test + admin
+ */
+
+const mongoose = require('mongoose');
+const bcrypt = require('bcryptjs');
+const fs = require('fs');
+const path = require('path');
+
+// ─── Load .env.local ──────────────────────────────────────────────────────────
+function loadEnv() {
+  const envFiles = ['.env.local', '.env'];
+  for (const file of envFiles) {
+    const envPath = path.join(process.cwd(), file);
+    if (fs.existsSync(envPath)) {
+      const content = fs.readFileSync(envPath, 'utf-8');
+      content.split('\n').forEach(line => {
+        const trimmed = line.trim();
+        if (!trimmed || trimmed.startsWith('#')) return;
+        const idx = trimmed.indexOf('=');
+        if (idx === -1) return;
+        const key = trimmed.slice(0, idx).trim();
+        const val = trimmed.slice(idx + 1).trim();
+        if (!process.env[key]) process.env[key] = val;
+      });
+      console.log(`📄 Loaded env from ${file}`);
+      break;
+    }
+  }
+}
+
+loadEnv();
+
+const MONGODB_URI = process.env.MONGODB_URI;
+if (!MONGODB_URI) {
+  console.error('❌ MONGODB_URI không được định nghĩa trong .env.local');
+  process.exit(1);
+}
+
+// ─── Seed Data ────────────────────────────────────────────────────────────────
+const SEED_MOVIES = [
+  { title: 'Inception', description: 'Một tên trộm tài giỏi đánh cắp bí mật từ trong tiềm thức người khác khi họ đang mơ. Anh được giao nhiệm vụ ngược lại - cấy ghép một ý tưởng vào đầu ốc một CEO.', videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4', thumbnail: 'https://image.tmdb.org/t/p/w500/9gk7adHYeDvHkCSEqAvQNLV5Uge.jpg', trailerUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4', isFree: true, requiredPlan: 'FREE', genre: ['Khoa học viễn tưởng', 'Hành động', 'Ly kỳ'], rating: 8.8, year: 2010, duration: '2h 28m', director: 'Christopher Nolan', cast: ['Leonardo DiCaprio', 'Joseph Gordon-Levitt', 'Elliot Page'], featured: true, views: 15000 },
+  { title: 'The Dark Knight', description: 'Batman đối mặt với Joker - tên tội phạm hỗn loạn nhất Gotham City, kẻ muốn xem cả thế giới chìm trong hỗn loạn và vô pháp luật.', videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4', thumbnail: 'https://image.tmdb.org/t/p/w500/qJ2tW6WMUDux911r6m7haRef0WH.jpg', trailerUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4', isFree: false, requiredPlan: 'PLUS', genre: ['Hành động', 'Tội phạm', 'Kịch tính'], rating: 9.0, year: 2008, duration: '2h 32m', director: 'Christopher Nolan', cast: ['Christian Bale', 'Heath Ledger', 'Aaron Eckhart'], featured: true, views: 22000 },
+  { title: 'Interstellar', description: 'Một nhóm phi hành gia du hành qua lỗ sâu đốc để tìm kiếm hành tinh mới cho nhân loại khi Trái Đất đang trên bờ vực diệt vong.', videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4', thumbnail: 'https://image.tmdb.org/t/p/w500/gEU2QniE6E77NI6lZFWFcvdcM7Z.jpg', trailerUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4', isFree: false, requiredPlan: 'PRO', genre: ['Khoa học viễn tưởng', 'Phiêu lưu', 'Kịch tính'], rating: 8.6, year: 2014, duration: '2h 49m', director: 'Christopher Nolan', cast: ['Matthew McConaughey', 'Anne Hathaway', 'Jessica Chastain'], featured: false, views: 18000 },
+  { title: 'Avengers: Endgame', description: 'Sau sự kiện thảm khốc của Infinity War, các siêu anh hùng còn lại phải thực hiện một kế hoạch táo bạo để đảo ngược hành động của Thanos.', videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4', thumbnail: 'https://image.tmdb.org/t/p/w500/or06FN3Dka5tukK1e9sl16pB3iy.jpg', trailerUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4', isFree: false, requiredPlan: 'PREMIUM', genre: ['Hành động', 'Phiêu lưu', 'Khoa học viễn tưởng'], rating: 8.4, year: 2019, duration: '3h 01m', director: 'Anthony & Joe Russo', cast: ['Robert Downey Jr.', 'Chris Evans', 'Mark Ruffalo'], featured: true, views: 35000 },
+  { title: 'Spider-Man: No Way Home', description: 'Peter Parker nhờ Doctor Strange thực hiện một phép thuật để thế giới quên tung tích của anh, nhưng mọi thứ vượt ngoài tầm kiểm soát.', videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerFun.mp4', thumbnail: 'https://image.tmdb.org/t/p/w500/1g0dhYtq4irTY1GPXvft6k4YLjm.jpg', trailerUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerFun.mp4', isFree: true, requiredPlan: 'FREE', genre: ['Hành động', 'Phiêu lưu', 'Khoa học viễn tưởng'], rating: 8.2, year: 2021, duration: '2h 28m', director: 'Jon Watts', cast: ['Tom Holland', 'Zendaya', 'Benedict Cumberbatch'], featured: false, views: 28000 },
+  { title: 'Dune: Part One', description: 'Paul Atreides, con trai của một gia tộc quý tộc, du hành đến hành tinh sa mạc nguy hiểm nhất vũ trụ để bảo vệ gia đình và hành tinh của mình.', videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyrides.mp4', thumbnail: 'https://image.tmdb.org/t/p/w500/d5NXSklXo0qyIYkgV48Zuhrw0B.jpg', trailerUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyrides.mp4', isFree: false, requiredPlan: 'PLUS', genre: ['Khoa học viễn tưởng', 'Phiêu lưu', 'Kịch tính'], rating: 8.0, year: 2021, duration: '2h 35m', director: 'Denis Villeneuve', cast: ['Timothée Chalamet', 'Rebecca Ferguson', 'Oscar Isaac'], featured: false, views: 12000 },
+  { title: 'The Matrix', description: 'Một hacker máy tính phát hiện ra sự thật về thực tại - thế giới anh đang sống chỉ là một thực tế ảo được tạo ra bởi máy móc thống trị.', videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerMeltdowns.mp4', thumbnail: 'https://image.tmdb.org/t/p/w500/f89U3ADr1oiB1s9GkdPOEpXUk5H.jpg', trailerUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerMeltdowns.mp4', isFree: true, requiredPlan: 'FREE', genre: ['Khoa học viễn tưởng', 'Hành động'], rating: 8.7, year: 1999, duration: '2h 16m', director: 'The Wachowskis', cast: ['Keanu Reeves', 'Laurence Fishburne', 'Carrie-Anne Moss'], featured: false, views: 20000 },
+  { title: 'Parasite', description: 'Hai gia đình - một giàu, một nghèo - bắt đầu một mối quan hệ phức tạp khi gia đình nghèo từng bước xâm nhập vào cuộc sống gia đình giàu có.', videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/SubaruOutbackOnStreetAndDirt.mp4', thumbnail: 'https://image.tmdb.org/t/p/w500/7IiTTgloJzvGI1TAYymCfbfl3vT.jpg', trailerUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/SubaruOutbackOnStreetAndDirt.mp4', isFree: false, requiredPlan: 'PRO', genre: ['Kịch tính', 'Hài kịch đen', 'Ly kỳ'], rating: 8.5, year: 2019, duration: '2h 12m', director: 'Bong Joon-ho', cast: ['Choi Woo-shik', 'Park So-dam', 'Song Kang-ho'], featured: true, views: 9000 },
+  { title: 'Top Gun: Maverick', description: 'Maverick quay trở lại huấn luyện thế hệ phi công chiến đấu mới, đối mặt với những thử thách và ký ức về quá khứ.', videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/TearsOfSteel.mp4', thumbnail: 'https://image.tmdb.org/t/p/w500/62HCnUTziyWcpDaBO2i1DX17ljH.jpg', trailerUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/TearsOfSteel.mp4', isFree: false, requiredPlan: 'PLUS', genre: ['Hành động', 'Kịch tính'], rating: 8.3, year: 2022, duration: '2h 10m', director: 'Joseph Kosinski', cast: ['Tom Cruise', 'Miles Teller', 'Jennifer Connelly'], featured: false, views: 16000 },
+  { title: 'Everything Everywhere All at Once', description: 'Một phụ nữ trung niên bình thường phát hiện ra rằng cô chỉ có thể cứu thế giới bằng cách khám phá mọi cuộc sống có thể có của mình trong vũ trụ đa chiều.', videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/VolkswagenGTIReview.mp4', thumbnail: 'https://image.tmdb.org/t/p/w500/w3LxiVYdWWRvEVdn5RYq6jIqkb1.jpg', trailerUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/VolkswagenGTIReview.mp4', isFree: false, requiredPlan: 'PREMIUM', genre: ['Khoa học viễn tưởng', 'Hành động', 'Hài kịch'], rating: 7.8, year: 2022, duration: '2h 19m', director: 'Daniel Kwan & Daniel Scheinert', cast: ['Michelle Yeoh', 'Stephanie Hsu', 'Ke Huy Quan'], featured: false, views: 7500 },
+  { title: 'John Wick', description: 'Kẻ sát nhân huyền thoại John Wick thoái lui nhưng bị kéo trở lại thế giới ngầm khi những tên tội phạm giết chó cưng và cướp xe của anh.', videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/WhatCarCanYouGetForAGrand.mp4', thumbnail: 'https://image.tmdb.org/t/p/w500/fZPSd91yGE9fCcCe6OoQr6E3Bev.jpg', trailerUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/WhatCarCanYouGetForAGrand.mp4', isFree: true, requiredPlan: 'FREE', genre: ['Hành động', 'Tội phạm', 'Ly kỳ'], rating: 7.4, year: 2014, duration: '1h 41m', director: 'Chad Stahelski', cast: ['Keanu Reeves', 'Michael Nyqvist', 'Alfie Allen'], featured: false, views: 11000 },
+  { title: 'Black Panther', description: "Sau cái chết của cha mình, T'Challa trở về Wakanda để kế vị ngai vàng. Nhưng danh hiệu Black Panther của anh bị thách thức khi kẻ thù cũ xuất hiện.", videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4', thumbnail: 'https://image.tmdb.org/t/p/w500/uxzzxijgPIY7slzFvMotPv8wjKA.jpg', trailerUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4', isFree: false, requiredPlan: 'PLUS', genre: ['Hành động', 'Phiêu lưu', 'Khoa học viễn tưởng'], rating: 7.3, year: 2018, duration: '2h 14m', director: 'Ryan Coogler', cast: ['Chadwick Boseman', 'Michael B. Jordan', "Lupita Nyong'o"], featured: false, views: 14000 },
+];
+
+// ─── Main ─────────────────────────────────────────────────────────────────────
+async function autoSeed() {
+  console.log('\n🌱 CineStream Auto-Seed đang kiểm tra database...\n');
+
+  try {
+    await mongoose.connect(MONGODB_URI);
+    const db = mongoose.connection.useDb('cinestream');
+
+    const movieCount = await db.collection('movies').countDocuments();
+    const userCount = await db.collection('users').countDocuments();
+
+    if (movieCount > 0 && userCount > 0) {
+      console.log(`✅ DB đã có ${movieCount} phim và ${userCount} tài khoản → Bỏ qua seed.\n`);
+      await mongoose.disconnect();
+      return;
+    }
+
+    console.log('📦 DB trống → Bắt đầu seed dữ liệu...\n');
+
+    // ─── Seed Movies ──────────────────────────────────────────────────────────
+    if (movieCount === 0) {
+      await db.collection('movies').deleteMany({});
+      const now = new Date();
+      const moviesWithDates = SEED_MOVIES.map(m => ({ ...m, createdAt: now, updatedAt: now }));
+      const result = await db.collection('movies').insertMany(moviesWithDates);
+      console.log(`   🎬 Đã seed ${result.insertedCount} phim`);
+    }
+
+    // ─── Seed Test Users ──────────────────────────────────────────────────────
+    const testEmails = ['free@test.com', 'plus@test.com', 'pro@test.com', 'premium@test.com'];
+    await db.collection('users').deleteMany({ email: { $in: testEmails } });
+
+    const testUsers = [
+      { name: 'FREE User', email: 'free@test.com', password: 'password123', plan: 'FREE', balance: 500000, isAdmin: false },
+      { name: 'PLUS User', email: 'plus@test.com', password: 'password123', plan: 'PLUS', balance: 500000, isAdmin: false, subscriptionEnd: new Date(Date.now() + 30*24*60*60*1000) },
+      { name: 'PRO User', email: 'pro@test.com', password: 'password123', plan: 'PRO', balance: 500000, isAdmin: false, subscriptionEnd: new Date(Date.now() + 90*24*60*60*1000) },
+      { name: 'PREMIUM User', email: 'premium@test.com', password: 'password123', plan: 'PREMIUM', balance: 500000, isAdmin: false, subscriptionEnd: new Date(Date.now() + 365*24*60*60*1000) },
+    ];
+
+    for (const u of testUsers) {
+      const hashed = await bcrypt.hash(u.password, 12);
+      await db.collection('users').insertOne({
+        ...u,
+        password: hashed,
+        favoriteMovies: [],
+        watchHistory: [],
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+    }
+    console.log(`   👥 Đã seed ${testUsers.length} tài khoản test (password: password123)`);
+
+    // ─── Seed Admin Account ───────────────────────────────────────────────────
+    const existingAdmin = await db.collection('users').findOne({ email: 'admin@cinestream.com' });
+    if (!existingAdmin) {
+      const adminPassword = await bcrypt.hash('Admin@2024', 12);
+      await db.collection('users').insertOne({
+        name: 'Administrator',
+        email: 'admin@cinestream.com',
+        password: adminPassword,
+        plan: 'PREMIUM',
+        balance: 99999999,
+        isAdmin: true,
+        favoriteMovies: [],
+        watchHistory: [],
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+      console.log(`   🛡️  Đã seed tài khoản Admin (admin@cinestream.com / Admin@2024)`);
+    } else {
+      // Ensure isAdmin flag is set
+      await db.collection('users').updateOne(
+        { email: 'admin@cinestream.com' },
+        { $set: { isAdmin: true, plan: 'PREMIUM' } }
+      );
+      console.log(`   🛡️  Admin account đã có sẵn`);
+    }
+
+    console.log('\n✅ Seed hoàn tất!\n');
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    console.log('📋 Tài khoản test:');
+    console.log('   free@test.com / plus@test.com / pro@test.com / premium@test.com');
+    console.log('   Password: password123');
+    console.log('   Admin: admin@cinestream.com / Admin@2024');
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
+
+    await mongoose.disconnect();
+  } catch (err) {
+    console.error('❌ Seed thất bại:', err.message);
+    await mongoose.disconnect();
+    process.exit(1);
+  }
+}
+
+autoSeed();
