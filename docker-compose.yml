@@ -1,0 +1,21 @@
+version: '3.8'
+
+services:
+  # Ứng dụng Next.js của bạn
+  app:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      - DATABASE_URL=mongodb+srv://<user>:<password>@cluster.mongodb.net/cinestream?retryWrites=true&w=majority
+      - REDIS_URL=redis://redis:6379
+      - NEXTAUTH_SECRET=your_secret_here
+    depends_on:
+      - redis
+
+  # Dịch vụ Redis chạy kèm
+  redis:
+    image: redis:alpine
+    ports:
+      - "6379:6379"
+    restart: always
