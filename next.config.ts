@@ -10,7 +10,10 @@ const nextConfig: NextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
-  // Xóa đoạn eslint bị báo lỗi đi
+  experimental: {
+    // Ép kiểu 'any' để TypeScript không bắt bẻ thuộc tính mới này
+    allowedDevOrigins: ['127.0.0.1', 'localhost'],
+  } as any, 
 };
 
 export default nextConfig;

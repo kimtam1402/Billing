@@ -1,21 +1,30 @@
 version: '3.8'
 
 services:
-  # Ứng dụng Next.js của bạn
   app:
     build: .
     ports:
       - "3000:3000"
     environment:
-      - DATABASE_URL=mongodb+srv://<user>:<password>@cluster.mongodb.net/cinestream?retryWrites=true&w=majority
+      - DATABASE_URL=mongodb+srv://...
       - REDIS_URL=redis://redis:6379
-      - NEXTAUTH_SECRET=your_secret_here
     depends_on:
       - redis
 
-  # Dịch vụ Redis chạy kèm
   redis:
     image: redis:alpine
-    ports:
-      - "6379:6379"
     restart: always
+
+  n8n:
+    image: n8nio/n8n
+    ports:
+      - "5678:5678"
+    environment:
+      - N8N_HOST=localhost
+    volumes:
+      - n8n_data:/home/node/.local/share/n8n
+    network_mode: "host" # Quan trọng để n8n gọi localhost:3000 trên Linux
+
+# ĐƯA PHẦN NÀY RA NGOÀI CÙNG (Sát lề trái)
+volumes:
+  n8n_data:
