@@ -10,11 +10,7 @@ RUN npx prisma generate
 
 COPY . .
 
-# THÊM DÒNG NÀY (Thay bằng link MongoDB Atlas thật của bạn)
-ENV MONGODB_URI="mongodb+srv://trinh:trinh%402604@cluster0.b9tpxws.mongodb.net/cinestream?retryWrites=true&w=majority&appName=Cluster0"
-ENV DATABASE_URL="mongodb+srv://trinh:trinh%402604@cluster0.b9tpxws.mongodb.net/cinestream?retryWrites=true&w=majority&appName=Cluster0"
-ENV NEXTAUTH_SECRET="cinestream-super-secret-key-2024-very-long-string"
-
+# Không hard-code các biến env ở đây nữa để tránh lộ mã nguồn
 RUN npm run build
 
 EXPOSE 3000
