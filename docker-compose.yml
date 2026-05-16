@@ -1,30 +1,39 @@
 version: '3.8'
 
 services:
-  app:
-    build: .
-    ports:
-      - "3000:3000"
-    environment:
-      - DATABASE_URL=mongodb+srv://...
-      - REDIS_URL=redis://redis:6379
-    depends_on:
-      - redis
-
   redis:
     image: redis:alpine
+    container_name: cinestream-redis
     restart: always
+    ports:
+      - "6379:6379"
 
   n8n:
     image: n8nio/n8n
+    container_name: cinestream-n8n
+    restart: always
     ports:
       - "5678:5678"
     environment:
       - N8N_HOST=localhost
     volumes:
       - n8n_data:/home/node/.local/share/n8n
-    network_mode: "host" # Quan trọng để n8n gọi localhost:3000 trên Linux
+    network_mode: "host"
 
-# ĐƯA PHẦN NÀY RA NGOÀI CÙNG (Sát lề trái)
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: cinestream-app
+    restart: always
+    # Sử dụng chung mạng host với n8n để giải quyết triệt để lỗi kết nối nội bộ
+    network_mode: "host" 
+    environment:
+      - MONGODB_URI=mongodb+srv://trinh:trinh%402604@cluster0.b9tpxws.mongodb.net/cinestream?retryWrites=true&w=majority&appName=Cluster0
+      - DATABASE_URL=mongodb+srv://trinh:trinh%402604@cluster0.b9tpxws.mongodb.net/cinestream?retryWrites=true&w=majority&appName=Cluster0
+      - REDIS_URL=redis://127.0.0.1:6379
+      - NEXTAUTH_SECRET=cinestream-super-secret-key-2026-very-long-string
+      - NEXTAUTH_URL=http://103.142.27.229:3000
+
 volumes:
   n8n_data:
